@@ -344,8 +344,12 @@ function handleJogTurn(delta) {
 
 function handleClick() {
     if (screen === 'browser') {
-        // Load this preset into the current active pad, then open edit
-        dspSet('preset', presetIndex);
+        // Only apply preset when selected preset name differs from active name.
+        // This preserves unsaved edits when re-entering edit on the same preset.
+        const activePresetName = dspGet('preset_name') || '';
+        if (presetName !== activePresetName) {
+            dspSet('preset', presetIndex);
+        }
         saveStatus  = '---';
         saveFlashTicks = 0;
         editValueMode = false;
