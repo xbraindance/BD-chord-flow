@@ -149,6 +149,31 @@ int main(void) {
     expect_int_param(api, inst, "global_transpose", -3);
     expect_int_param(api, inst, "pad_octave", 5);
 
+    /* Reset patch should reset all pads to C major root/no bass defaults. */
+    api->set_param(inst, "pad", "1");
+    api->set_param(inst, "root", "g");
+    api->set_param(inst, "chord_type", "min7");
+    api->set_param(inst, "inversion", "2nd");
+    api->set_param(inst, "bass", "d");
+    api->set_param(inst, "pad", "2");
+    api->set_param(inst, "root", "a");
+    api->set_param(inst, "chord_type", "dom7");
+    api->set_param(inst, "inversion", "1st");
+    api->set_param(inst, "bass", "e");
+    api->set_param(inst, "reset_patch", "1");
+
+    api->set_param(inst, "pad", "1");
+    expect_str_param(api, inst, "root", "c");
+    expect_str_param(api, inst, "chord_type", "maj");
+    expect_str_param(api, inst, "inversion", "root");
+    expect_str_param(api, inst, "bass", "none");
+
+    api->set_param(inst, "pad", "2");
+    expect_str_param(api, inst, "root", "c");
+    expect_str_param(api, inst, "chord_type", "maj");
+    expect_str_param(api, inst, "inversion", "root");
+    expect_str_param(api, inst, "bass", "none");
+
     api->destroy_instance(inst);
     printf("PASS: chordflow octave transpose and persistence\n");
     return 0;

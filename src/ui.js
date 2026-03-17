@@ -37,8 +37,8 @@ const ROW_H    = 9;
 const VISIBLE  = Math.floor((LIST_BOT - LIST_TOP) / ROW_H); // 4
 
 // ─── Edit rows ────────────────────────────────────────────────────────────────
-const EDIT_KEYS   = ['pad','pad_octave','root','chord_type','inversion','bass','strum','strum_dir','articulation','reverse_art','global_octave','global_transpose','bank','save'];
-const EDIT_LABELS = ['Pad','Pad Oct','Root','Chord Type','Inversion','Bass','Strum','Strum Dir','Articulation','Reverse Art','Global Oct','Global Trans','Bank','Save'];
+const EDIT_KEYS   = ['pad','root','chord_type','inversion','bass','pad_octave','strum','strum_dir','articulation','reverse_art','global_octave','global_transpose','bank','reset_patch','save'];
+const EDIT_LABELS = ['Pad','Root','Chord Type','Inversion','Bass','Pad Oct','Strum','Strum Dir','Articulation','Reverse Art','Global Oct','Global Trans','Bank','Reset Patch','Save'];
 const EDIT_ENUMS  = {
     root:         ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'],
     bass:         ['none','c','c#','d','d#','e','f','f#','g','g#','a','a#','b'],
@@ -80,6 +80,9 @@ let editVals = {};
 let editValueMode = false;
 let saveStatus = '---';
 let saveFlashTicks = 0;
+let resetStatus = 'ready';
+let resetFlashTicks = 0;
+let resetConfirmArmed = false;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -132,15 +135,33 @@ function readEditVals(knownPad) {
     // Read all pad params from DSP — DSP returns values for current active pad
     editVals = {};
     for (const k of EDIT_KEYS) {
-        if (k === 'save') continue;
+        if (k === 'save' || k === 'reset_patch') continue;
         editVals[k] = dspGet(k);
     }
     editVals.save = saveStatus;
+    editVals.reset_patch = resetStatus;
     // If caller knows the pad number for certain, use it directly
     // (guards against DSP not yet reflecting the switch)
     if (knownPad !== undefined) {
         editVals['pad'] = String(knownPad);
     }
+}
+
+function triggerResetPatch() {
+    if (!resetConfirmArmed) {
+        resetConfirmArmed = true;
+        resetStatus = 'confirm';
+        editVals.reset_patch = resetStatus;
+        needsRedraw = true;
+        return;
+    }
+    dspSet('reset_patch', '1');
+    resetConfirmArmed = false;
+    resetStatus = 'done';
+    resetFlashTicks = 40;
+    readEditVals();
+    editVals.reset_patch = resetStatus;
+    needsRedraw = true;
 }
 
 function triggerSave() {
@@ -171,6 +192,10 @@ function cycleVal(delta) {
     if (!key) return;
     if (key === 'save') {
         if (delta > 0) triggerSave();
+        return;
+    }
+    if (key === 'reset_patch') {
+        if (delta > 0) triggerResetPatch();
         return;
     }
 
@@ -306,6 +331,11 @@ function handleJogTurn(delta) {
         if (editValueMode) {
             cycleVal(delta);
         } else {
+            if (resetConfirmArmed) {
+                resetConfirmArmed = false;
+                resetStatus = 'ready';
+                editVals.reset_patch = resetStatus;
+            }
             editRow = clamp(editRow + delta, 0, EDIT_KEYS.length - 1);
             needsRedraw = true;
         }
@@ -329,6 +359,10 @@ function handleClick() {
             triggerSave();
             return;
         }
+        if (key === 'reset_patch') {
+            triggerResetPatch();
+            return;
+        }
         if (editValueMode) {
             editValueMode = false;
         } else {
@@ -340,6 +374,8 @@ function handleClick() {
 
 function handleBack() {
     if (screen === 'edit') {
+        resetConfirmArmed = false;
+        resetStatus = 'ready';
         editValueMode = false;
         screen      = 'browser';
         refreshPreset();
@@ -392,6 +428,14 @@ globalThis.tick = function() {
             if (saveFlashTicks === 0 && saveStatus !== '---') {
                 saveStatus = '---';
                 editVals.save = saveStatus;
+                needsRedraw = true;
+            }
+        }
+        if (resetFlashTicks > 0) {
+            resetFlashTicks -= 1;
+            if (resetFlashTicks === 0 && resetStatus !== 'ready') {
+                resetStatus = 'ready';
+                editVals.reset_patch = resetStatus;
                 needsRedraw = true;
             }
         }

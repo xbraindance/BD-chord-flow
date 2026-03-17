@@ -20,6 +20,7 @@
         "Pad Oct sets per-pad octave transpose",
         "Bass sets slash bass note (or none)",
         "Bank jumps to the selected bank",
+        "Reset Patch asks for confirm, then resets all pads to C major/root/no bass",
         "Up/Down select row",
         "Jog changes value",
         "Save row + Jog Right (or Click) saves to User bank"

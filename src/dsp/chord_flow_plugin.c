@@ -59,6 +59,7 @@
 #define DEFAULT_PRESETS_FILE  "default.json"
 #define USER_BANK_NAME        "User"
 #define FACTORY_BANK_NAME     "Factory"
+#define PAD_TRIGGER_BASE_NOTE 36
 #define OCT_MIN               -6
 #define OCT_MAX               6
 #define GLOBAL_OCT_DEFAULT    2
@@ -309,6 +310,15 @@ static int parse_enum(const char **names, int count, const char *val) {
     return (v >= 0 && v < count) ? v : 0;
 }
 
+static int is_blank_str(const char *s) {
+    if (!s) return 1;
+    while (*s) {
+        if (*s != ' ' && *s != '\t' && *s != '\n' && *s != '\r') return 0;
+        s++;
+    }
+    return 1;
+}
+
 static void copy_cstr(char *dst, int dst_len, const char *src) {
     if (!dst || dst_len <= 0) return;
     if (!src) src = "";
@@ -550,6 +560,14 @@ static pad_slot_t default_slot(void) {
     return s;
 }
 
+static void reset_active_patch(expchords_t *inst) {
+    int i;
+    for (i = 0; i < PAD_COUNT; i++) {
+        /* default_slot() is C major/root/no bass with neutral timing/articulation */
+        inst->active_pad_slots[i] = default_slot();
+    }
+}
+
 /* ── File I/O with host logging (CLAUDE.md compliant) ───────────────────── */
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -602,12 +620,17 @@ static void load_presets_from_json(expchords_t *inst, const char *json, const ch
         memcpy(obj, start, len);
         obj[len] = '\0';
 
+        int has_name;
         preset_t *pr = &inst->presets[inst->preset_count];
         copy_cstr(pr->name, MAX_PRESET_NAME, "preset");
         copy_cstr(pr->bank, MAX_BANK_NAME, default_bank);
         pr->global_octave = clamp_i(json_get_int(obj, "global_octave", GLOBAL_OCT_DEFAULT), OCT_MIN, OCT_MAX);
         pr->global_transpose = clamp_i(json_get_int(obj, "global_transpose", GLOBAL_TRANSPOSE_DEFAULT), TRANSPOSE_MIN, TRANSPOSE_MAX);
-        json_get_str(obj, "name", pr->name, MAX_PRESET_NAME);
+        has_name = json_get_str(obj, "name", pr->name, MAX_PRESET_NAME);
+        if (!has_name || is_blank_str(pr->name)) {
+            free(obj);
+            continue;
+        }
         json_get_str(obj, "bank", pr->bank, MAX_BANK_NAME);
 
         /* Check for pads array */
@@ -912,12 +935,12 @@ static int process_midi(void *instance,
     uint8_t ch     = in_msg[0] & 0x0F;
     uint8_t note   = in_msg[1];
     uint8_t vel    = in_msg[2];
+    int pad = note_to_pad(note);
     int is_on  = (status == 0x90) && vel > 0;
     int is_off = (status == 0x80) || (status == 0x90 && vel == 0);
 
     /* Pad press: switch active pad */
     if (is_on) {
-        int pad = note_to_pad(note);
         if (pad > 0) {
             inst->current_pad = pad;
             LOG("pad pressed: %d", inst->current_pad);
@@ -934,7 +957,9 @@ static int process_midi(void *instance,
         int pad_idx = inst->current_pad - 1;
         pad_slot_t *s = &inst->active_pad_slots[pad_idx];
         int chord_notes[MAX_CHORD_NOTES];
-        int count = build_chord(s, inst->active_global_octave, inst->active_global_transpose, note, chord_notes, MAX_CHORD_NOTES);
+        /* Drum-pad triggers are buttons; keep pitch independent from trigger note. */
+        int input_pitch_note = (pad > 0) ? PAD_TRIGGER_BASE_NOTE : note;
+        int count = build_chord(s, inst->active_global_octave, inst->active_global_transpose, input_pitch_note, chord_notes, MAX_CHORD_NOTES);
 
         /* Strum timing */
         int strum_frames = 0;
@@ -1102,6 +1127,12 @@ static void set_param(void *instance, const char *key, const char *val) {
         rebuild_banks(inst);
         load_preset_into_slots(inst, target);
         save_presets(inst);
+        return;
+    }
+
+    if (strcmp(key, "reset_patch") == 0) {
+        reset_active_patch(inst);
+        LOG("reset_patch: active pad set reset to C major defaults");
         return;
     }
 

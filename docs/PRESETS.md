@@ -66,6 +66,20 @@ Each file is a JSON array:
 - `articulation` (int): `0=off`, `1=on`
 - `reverse_art` (int): `0=off`, `1=on`
 
+## Supported `chord_type` values
+
+```text
+maj, min, 5th, sus2, sus4, add2, add9, add11,
+6th, min6, maj7, min7, dom7, maj9, min9, dom9,
+dim, dim7, m7b5, aug, aug7, sus7, 7sus2, 7sus4,
+9sus, sus9, 11th, m11, sus11, 13th, maj13, min13,
+dom7add9, dom7b9, dom7#9, dom7#5, dom7alt, maj7#5, maj7b5, maj7#11, maj9#11,
+madd9, madd11, mb5, mb6, m7b13, m7add13, m11b5, mM13, sus13, add13,
+11sus, 11sus2, 13b9, 5add9, 5b9, 6sus2, 6sus2b5, 6sus4, 7#9#5, 9#11,
+dimM7, dim#5, dim11, addb9, aug#9, mb7, mb9, mb13, m6addb13,
+no3, no5, maj7add6, maj7sus2, maj9no3, maj6
+```
+
 ## Notes
 
 - Roots/bass are stored as lowercase sharp-note tokens.

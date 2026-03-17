@@ -49,6 +49,20 @@ static void send_note_on(midi_fx_api_v1_t *api, void *inst, int note) {
     (void)api->process_midi(inst, in, 3, out_msgs, out_lens, 16);
 }
 
+static int send_note_on_first_out_note(midi_fx_api_v1_t *api, void *inst, int note) {
+    uint8_t in[3];
+    uint8_t out_msgs[16][3];
+    int out_lens[16];
+    int out;
+
+    in[0] = 0x90;
+    in[1] = (uint8_t)note;
+    in[2] = 100;
+    out = api->process_midi(inst, in, 3, out_msgs, out_lens, 16);
+    if (out <= 0) fail("expected note-on output");
+    return (int)out_msgs[0][1];
+}
+
 int main(void) {
     host_api_v1_t host;
     midi_fx_api_v1_t *api;
@@ -84,6 +98,32 @@ int main(void) {
 
     send_note_on(api, inst, 68);
     expect_int_param(api, inst, "pad", 1);
+
+    /* Pad buttons should not transpose chord pitch by trigger note. */
+    api->set_param(inst, "pad", "1");
+    api->set_param(inst, "root", "c");
+    api->set_param(inst, "chord_type", "maj");
+    api->set_param(inst, "inversion", "root");
+    api->set_param(inst, "pad_octave", "0");
+    api->set_param(inst, "bass", "none");
+    api->set_param(inst, "global_octave", "2");
+    api->set_param(inst, "global_transpose", "0");
+
+    api->set_param(inst, "pad", "2");
+    api->set_param(inst, "root", "c");
+    api->set_param(inst, "chord_type", "maj");
+    api->set_param(inst, "inversion", "root");
+    api->set_param(inst, "pad_octave", "0");
+    api->set_param(inst, "bass", "none");
+
+    {
+        int n1 = send_note_on_first_out_note(api, inst, 36); /* pad 1 trigger */
+        int n2 = send_note_on_first_out_note(api, inst, 37); /* pad 2 trigger */
+        if (n1 != n2) {
+            fprintf(stderr, "FAIL: identical pad chords should match pitch, got %d vs %d\n", n1, n2);
+            return 1;
+        }
+    }
 
     api->destroy_instance(inst);
     printf("PASS: chordflow pad switching note map\n");
