@@ -572,21 +572,34 @@ static void reset_active_patch(expchords_t *inst) {
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
-    
-    struct stat st;
-    if (fstat(fileno(f), &st) != 0 || st.st_size <= 0 || st.st_size > 2*1024*1024) {
+
+    if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
         return NULL;
     }
-    
-    size_t sz = (size_t)st.st_size;
+    long end = ftell(f);
+    if (end <= 0 || end > 2L * 1024L * 1024L) {
+        fclose(f);
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t sz = (size_t)end;
     char *buf = malloc(sz + 1);
     if (!buf) {
         fclose(f);
         return NULL;
     }
-    
+
     size_t rd = fread(buf, 1, sz, f);
+    if (rd != sz) {
+        free(buf);
+        fclose(f);
+        return NULL;
+    }
     buf[rd] = '\0';
     fclose(f);
     return buf;
