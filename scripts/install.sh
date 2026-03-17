@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install Chord Flow module to Move
+# Install Chord Flow module to Move.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -96,6 +96,10 @@ Preset files used at runtime are under:
 - `*.json` (additional banks, one bank per file)
 - `user.json` (saved user presets)
 
+Custom chord bank `.json` files can be added either with Move Everything
+Installer (`Manage Presets`) or by copying files via SFTP into this `presets/`
+folder.
+
 ## References
 
 - Move Everything module docs: [MODULES.md](https://github.com/handcraftedcc/move-everything/blob/main/docs/MODULES.md)

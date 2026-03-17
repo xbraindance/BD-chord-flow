@@ -14,5 +14,14 @@
         "chainable": true,
         "component_type": "midi_fx",
         "raw_midi": true
+    },
+    "assets": {
+        "path": "presets",
+        "label": "Presets",
+        "extensions": [
+            ".json"
+        ],
+        "optional": true,
+        "description": "Upload additional preset bank JSON files."
     }
 }

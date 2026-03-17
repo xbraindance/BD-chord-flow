@@ -13,6 +13,12 @@ Save behavior:
 - Saving from UI always writes to the `User` bank.
 - Saved data is written to `presets/user.json`.
 
+## Adding Custom Banks
+
+Custom chord bank `.json` files can be added either with Move Everything
+Installer (`Manage Presets`) or by copying files via SFTP into the module
+`presets/` folder.
+
 ## Top-level schema
 
 Each file is a JSON array:
