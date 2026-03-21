@@ -3,7 +3,7 @@
     "id": "chord-flow",
     "name": "Chord Flow",
     "abbrev": "CF",
-    "version": "0.6.4",
+    "version": "0.6.5",
     "author": "Magnus Liljebergh",
     "builtin": false,
     "ui": "ui.js",

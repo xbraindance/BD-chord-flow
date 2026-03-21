@@ -46,6 +46,7 @@ int main(void) {
     char presets_dir[1024];
     char extra_path[1024];
     char extra2_path[1024];
+    char legacy_default_path[1024];
     char preset_name[128];
     char bank_name[128];
 
@@ -72,6 +73,16 @@ int main(void) {
         "\"pads\":[{\"octave\":0,\"root\":\"e\",\"bass\":\"none\",\"chord_type\":\"min\",\"inversion\":0,"
         "\"strum\":0,\"strum_dir\":0,\"articulation\":0,\"reverse_art\":0}]}]"
     );
+    /* Simulate stale legacy file left behind by overlay installs.
+       The runtime should ignore this reserved file to avoid showing old
+       Factory banks after upgrading to FMC-only releases. */
+    snprintf(legacy_default_path, sizeof(legacy_default_path), "%s/default.json", presets_dir);
+    write_text_file(
+        legacy_default_path,
+        "[{\"name\":\"Legacy Factory\",\"bank\":\"Factory\",\"global_octave\":2,\"global_transpose\":0,"
+        "\"pads\":[{\"octave\":0,\"root\":\"c\",\"bass\":\"none\",\"chord_type\":\"maj\",\"inversion\":0,"
+        "\"strum\":0,\"strum_dir\":0,\"articulation\":0,\"reverse_art\":0}]}]"
+    );
 
     api = move_midi_fx_init(&host);
     if (!api || !api->create_instance || !api->destroy_instance || !api->set_param || !api->get_param) {
@@ -82,7 +93,7 @@ int main(void) {
     if (!inst) fail("create_instance failed");
 
     if (get_int_param(api, inst, "preset_count") != 2) {
-        fprintf(stderr, "FAIL: expected preset_count 2, got %d\n", get_int_param(api, inst, "preset_count"));
+        fprintf(stderr, "FAIL: expected preset_count 2 (legacy default ignored), got %d\n", get_int_param(api, inst, "preset_count"));
         return 1;
     }
     if (get_int_param(api, inst, "bank_count") != 2) {

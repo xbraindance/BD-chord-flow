@@ -32,7 +32,7 @@
  *   articulation  enum     off/on
  *   reverse_art   enum     off/on
  *   save          string   preset name to save as (writes current pad collection)
- *   state         string   (read-only) JSON snapshot of current pad's settings
+ *   state         string   JSON snapshot/restore of selected preset + current pad settings
  */
 
 #include <stdint.h>
@@ -48,7 +48,7 @@
 /* ── API version ──────────────────────────────────────────────────────────── */
 #define MIDI_FX_API_VERSION   1
 #define MIDI_FX_MAX_OUT       16
-#define MAX_PRESETS           256
+#define MAX_PRESETS           1024
 #define MAX_CHORD_NOTES       8
 #define MAX_PRESET_NAME       48
 #define MAX_BANK_NAME         32
@@ -56,9 +56,8 @@
 #define MAX_PENDING           64
 #define PRESETS_SUBDIR        "presets"
 #define USER_PRESETS_FILE     "user.json"
-#define DEFAULT_PRESETS_FILE  "default.json"
+#define LEGACY_DEFAULT_FILE   "default.json"
 #define USER_BANK_NAME        "User"
-#define FACTORY_BANK_NAME     "Factory"
 #define PAD_TRIGGER_BASE_NOTE 36
 #define OCT_MIN               -6
 #define OCT_MAX               6
@@ -383,10 +382,6 @@ static int has_json_ext(const char *name) {
 static void infer_bank_name_from_filename(const char *filename, char *out, int out_len) {
     int i = 0;
     int new_word = 1;
-    if (strcmp(filename, DEFAULT_PRESETS_FILE) == 0) {
-        copy_cstr(out, out_len, FACTORY_BANK_NAME);
-        return;
-    }
     if (strcmp(filename, USER_PRESETS_FILE) == 0) {
         copy_cstr(out, out_len, USER_BANK_NAME);
         return;
@@ -407,7 +402,7 @@ static void infer_bank_name_from_filename(const char *filename, char *out, int o
         }
     }
     out[i] = '\0';
-    if (i == 0) copy_cstr(out, out_len, FACTORY_BANK_NAME);
+    if (i == 0) copy_cstr(out, out_len, "Imported");
 }
 
 static int find_bank_index_by_name(expchords_t *inst, const char *name) {
@@ -423,6 +418,14 @@ static int find_preset_index_by_bank_and_name(expchords_t *inst, const char *ban
     for (i = 0; i < inst->preset_count; i++) {
         if (same_bank(inst->presets[i].bank, bank) && strcmp(inst->presets[i].name, name) == 0)
             return i;
+    }
+    return -1;
+}
+
+static int find_preset_index_by_name(expchords_t *inst, const char *name) {
+    int i;
+    for (i = 0; i < inst->preset_count; i++) {
+        if (strcmp(inst->presets[i].name, name) == 0) return i;
     }
     return -1;
 }
@@ -454,7 +457,7 @@ static void rebuild_banks(expchords_t *inst) {
         }
     }
     if (inst->bank_count == 0) {
-        copy_cstr(inst->banks[0].name, MAX_BANK_NAME, FACTORY_BANK_NAME);
+        copy_cstr(inst->banks[0].name, MAX_BANK_NAME, USER_BANK_NAME);
         inst->banks[0].first_preset = 0;
         inst->banks[0].count = 0;
         inst->bank_count = 1;
@@ -528,6 +531,13 @@ static int json_get_int(const char *json, const char *key, int def) {
     int v = def;
     parse_int_val(p, &v);
     return v;
+}
+
+static int json_try_get_int(const char *json, const char *key, int *out) {
+    const char *p = json_find_key(json, key);
+    if (!p || !out) return 0;
+    parse_int_val(p, out);
+    return 1;
 }
 
 static int json_get_str(const char *json, const char *key, char *dst, int dlen) {
@@ -756,12 +766,18 @@ static void load_additional_preset_files(expchords_t *inst, const char *presets_
         const char *name = ent->d_name;
         if (name[0] == '.') continue;
         if (!has_json_ext(name)) continue;
-        if (strcmp(name, DEFAULT_PRESETS_FILE) == 0) continue;
         if (strcmp(name, USER_PRESETS_FILE) == 0) continue;
+        /* Ignore stale legacy file from old releases.
+           Overlay installs can leave it behind, which reintroduces
+           unwanted Factory banks after upgrading to FMC-only content. */
+        if (strcmp(name, LEGACY_DEFAULT_FILE) == 0) continue;
         snprintf(path, sizeof(path), "%s/%s", presets_dir, name);
         infer_bank_name_from_filename(name, bank_name, sizeof(bank_name));
         load_presets_from_file(inst, path, bank_name);
-        if (inst->preset_count >= MAX_PRESETS) break;
+        if (inst->preset_count >= MAX_PRESETS) {
+            LOG("preset load reached limit (%d), additional files skipped", MAX_PRESETS);
+            break;
+        }
     }
     closedir(dir);
 }
@@ -769,16 +785,11 @@ static void load_additional_preset_files(expchords_t *inst, const char *presets_
 static void load_presets(expchords_t *inst) {
     char presets_path[800];
     char user_path[800];
-    char default_path[800];
     int i;
 
     inst->preset_count = 0;
     inst->bank_count = 0;
     inst->active_bank = 0;
-
-    snprintf(default_path, sizeof(default_path), "%s/%s/%s",
-             inst->module_dir, PRESETS_SUBDIR, DEFAULT_PRESETS_FILE);
-    load_presets_from_file(inst, default_path, FACTORY_BANK_NAME);
 
     snprintf(presets_path, sizeof(presets_path), "%s/%s",
              inst->module_dir, PRESETS_SUBDIR);
@@ -791,8 +802,8 @@ static void load_presets(expchords_t *inst) {
     if (inst->preset_count == 0) {
         /* Hardcoded fallback */
         inst->preset_count = 1;
-        copy_cstr(inst->presets[0].name, MAX_PRESET_NAME, "Default");
-        copy_cstr(inst->presets[0].bank, MAX_BANK_NAME, FACTORY_BANK_NAME);
+        copy_cstr(inst->presets[0].name, MAX_PRESET_NAME, "User Init");
+        copy_cstr(inst->presets[0].bank, MAX_BANK_NAME, USER_BANK_NAME);
         inst->presets[0].global_octave = GLOBAL_OCT_DEFAULT;
         inst->presets[0].global_transpose = GLOBAL_TRANSPOSE_DEFAULT;
         for (i = 0; i < PAD_COUNT; i++)
@@ -1148,6 +1159,69 @@ static void set_param(void *instance, const char *key, const char *val) {
 
     LOG("set_param: key=%s val=%s", key, val);
 
+    if (strcmp(key, "state") == 0) {
+        char s_val[96];
+        char num[32];
+        char preset_name[MAX_PRESET_NAME];
+        char bank_name[MAX_BANK_NAME];
+        int parsed;
+        int idx = -1;
+
+        if (json_try_get_int(val, "preset", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "preset", num);
+        } else {
+            int has_bank = json_get_str(val, "bank", bank_name, sizeof(bank_name));
+            if (json_get_str(val, "preset_name", preset_name, sizeof(preset_name))) {
+                if (has_bank) idx = find_preset_index_by_bank_and_name(inst, bank_name, preset_name);
+                if (idx < 0) idx = find_preset_index_by_name(inst, preset_name);
+                if (idx >= 0) {
+                    snprintf(num, sizeof(num), "%d", idx);
+                    set_param(inst, "preset", num);
+                }
+            } else if (has_bank) {
+                int bank_idx = find_bank_index_by_name(inst, bank_name);
+                if (bank_idx >= 0) {
+                    snprintf(num, sizeof(num), "%d", bank_idx);
+                    set_param(inst, "bank", num);
+                }
+            }
+        }
+
+        if (json_try_get_int(val, "current_pad", &parsed) || json_try_get_int(val, "pad", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "pad", num);
+        }
+        if (json_try_get_int(val, "global_octave", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "global_octave", num);
+        }
+        if (json_try_get_int(val, "global_transpose", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "global_transpose", num);
+        }
+        if (json_try_get_int(val, "pad_octave", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "pad_octave", num);
+        }
+        if (json_get_str(val, "root", s_val, sizeof(s_val))) set_param(inst, "root", s_val);
+        if (json_get_str(val, "bass", s_val, sizeof(s_val))) set_param(inst, "bass", s_val);
+        if (json_get_str(val, "chord_type", s_val, sizeof(s_val))) set_param(inst, "chord_type", s_val);
+        if (json_get_str(val, "inversion", s_val, sizeof(s_val))) set_param(inst, "inversion", s_val);
+        else if (json_try_get_int(val, "inversion", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "inversion", num);
+        }
+        if (json_try_get_int(val, "strum", &parsed)) {
+            snprintf(num, sizeof(num), "%d", parsed);
+            set_param(inst, "strum", num);
+        }
+        if (json_get_str(val, "strum_dir", s_val, sizeof(s_val))) set_param(inst, "strum_dir", s_val);
+        if (json_get_str(val, "articulation", s_val, sizeof(s_val))) set_param(inst, "articulation", s_val);
+        if (json_get_str(val, "reverse_art", s_val, sizeof(s_val))) set_param(inst, "reverse_art", s_val);
+        return;
+    }
+
     if (strcmp(key, "preset") == 0) {
         int idx = atoi(val);
         if (idx >= 0 && idx < inst->preset_count)
@@ -1337,11 +1411,13 @@ static int get_param(void *instance, const char *key, char *buf, int buf_len) {
     }
     if (strcmp(key,"state")==0)
         return snprintf(buf,buf_len,
-            "{\"bank\":\"%s\",\"current_pad\":%d,\"global_octave\":%d,\"global_transpose\":%d,\"pad_octave\":%d,"
+            "{\"preset\":%d,\"preset_name\":\"%s\",\"bank\":\"%s\",\"current_pad\":%d,\"global_octave\":%d,\"global_transpose\":%d,\"pad_octave\":%d,"
             "\"root\":\"%s\",\"bass\":\"%s\",\"chord_type\":\"%s\","
             "\"inversion\":\"%s\",\"strum\":%d,"
             "\"strum_dir\":\"%s\",\"articulation\":\"%s\","
             "\"reverse_art\":\"%s\"}",
+            inst->active_preset,
+            (inst->active_preset >= 0 && inst->active_preset < inst->preset_count) ? inst->presets[inst->active_preset].name : "---",
             (inst->active_bank >= 0 && inst->active_bank < inst->bank_count) ? inst->banks[inst->active_bank].name : "",
             inst->current_pad, inst->active_global_octave, inst->active_global_transpose, s->octave,
             ROOT_NAMES[s->root], BASS_NAMES[(s->bass >= 0 && s->bass < ROOT_COUNT) ? (s->bass + 1) : 0], TYPE_NAMES[s->type],
