@@ -1,4 +1,4 @@
-# Chord Flow (Move Everything)
+# Chord Flow (Schwung formaly known as Move Everything)
 
 Chord Flow is a chainable MIDI FX module for Move Everything that lets you play and combine chords for better chord progressions. Browse banks of chord presets, play pads to trigger chords, and edit/save full pad sets. 
 
@@ -41,7 +41,6 @@ tests/
   chordflow_ui_behavior_test.sh
 ```
 
-This layout matches the same structure used by modules like `superarp` and `eucalypso`.
 
 ## Preset banks
 
