@@ -1,0 +1,27 @@
+{
+    "api_version": 1,
+    "id": "chord-flow",
+    "name": "Chord Flow",
+    "abbrev": "CF",
+    "version": "0.6.1",
+    "author": "xbraindance & handcraftedcc",
+    "builtin": false,
+    "ui": "ui.js",
+    "dsp": "dsp.so",
+    "component_type": "midi_fx",
+    "chainable": true,
+    "capabilities": {
+        "chainable": true,
+        "component_type": "midi_fx",
+        "raw_midi": true
+    },
+    "assets": {
+        "path": "presets",
+        "label": "Presets",
+        "extensions": [
+            ".json"
+        ],
+        "optional": true,
+        "description": "Upload additional preset bank JSON files."
+    }
+}

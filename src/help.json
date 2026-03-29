@@ -1,0 +1,38 @@
+{
+  "title": "Chord Flow",
+  "summary": "Banked chord preset browser/editor with per-pad chord controls and User-bank save.",
+  "sections": [
+    {
+      "title": "Browser",
+      "items": [
+        "Header shows current bank (CF: <bank>)",
+        "Jog: browse presets (continuous across banks)",
+        "Click: load preset and enter edit",
+        "Back: return to module menu"
+      ]
+    },
+    {
+      "title": "Edit",
+      "items": [
+        "Pad presses select the active pad",
+        "Global Oct (default +2) sets preset-wide octave transpose",
+        "Global Trn sets preset-wide semitone transpose",
+        "Pad Oct sets per-pad octave transpose",
+        "Bass sets slash bass note (or none)",
+        "Bank jumps to the selected bank",
+        "Reset Patch asks for confirm, then resets all pads to C major/root/no bass",
+        "Up/Down select row",
+        "Jog changes value",
+        "Save row + Jog Right (or Click) saves to User bank"
+      ]
+    },
+    {
+      "title": "Presets",
+      "items": [
+        "Factory presets load from presets/default.json",
+        "Additional presets/*.json load as additional banks",
+        "User presets are saved to presets/user.json"
+      ]
+    }
+  ]
+}
