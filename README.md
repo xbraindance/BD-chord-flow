@@ -11,11 +11,11 @@ Chord Flow is a chainable MIDI FX module for Schwung that lets you trigger chord
 
 ## Quick start
 
-1. First step, for any midi or sound generator module, is to make sure Native Move sends midi to Schwung by pressing Shift + track button for the track and set midi out channel. e.g. Track button 4 > Midi channel 4.
+1. Make sure Native Move sends midi to Schwung by pressing Shift + track button for the track and set midi out channel. e.g. Track button 4 > Midi channel 4.
 
-2. Change that track layout to an empty/template drum track. It needs to be in drum pad mode to trigger the 16 midi chords in Chord Flow.
+2. Change that track layout to an empty/template drum track in Move native mode. It needs to be in drum pad mode to trigger the 16 midi chords in Chord Flow.
 
-3. Then shift + Vol + the track button that you just set the midi channel for in step 1. to enter Schwung signal chain view.
+3. Then shift + Vol + the track button that you just set the midi channel for in step 1 to enter Schwung signal chain view.
 
 4. Press the second slot aka “Synth” and select a synth you want to chord trigger.
 
